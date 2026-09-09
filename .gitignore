@@ -1,0 +1,18 @@
+# Backend (Python / uv)
+backend/.venv/
+backend/.env
+backend/storage/
+backend/__pycache__/
+**/__pycache__/
+*.py[oc]
+
+# Frontend (Node)
+frontend/node_modules/
+frontend/dist/
+
+# Editors / OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+.claude/
