@@ -3,20 +3,16 @@ import { Link, useParams } from "react-router-dom";
 import {
   ArrowLeft,
   Bot,
-  Calendar,
   CheckCircle2,
   ExternalLink,
   FileText,
-  Hash,
   Loader2,
   RefreshCw,
   Save,
   Send,
   Sparkles,
   Table2,
-  ToggleLeft,
   Trash2,
-  Type,
   UploadCloud,
   User,
 } from "lucide-react";
@@ -31,6 +27,8 @@ import { useDocument, useUploadDocument, getDocumentFileUrl } from "../api/docum
 import { useDocumentChat } from "../api/chat";
 import { Spinner } from "../components/common/Spinner";
 import { guessPreviewKind } from "../utils/documentPreview";
+import { DATA_TYPE_ICON, DATA_TYPE_LABEL } from "../utils/dataType";
+import { useResizableSplit } from "../hooks/useResizableSplit";
 import type {
   ChatMessage,
   DataType,
@@ -38,22 +36,6 @@ import type {
   PrimitiveValue,
   SuggestedField,
 } from "../api/types";
-
-const DATA_TYPE_LABEL: Record<DataType, string> = {
-  texto: "texto",
-  numero: "número",
-  fecha: "fecha",
-  booleano: "booleano",
-  tabla: "tabla",
-};
-
-const DATA_TYPE_ICON: Record<DataType, typeof Type> = {
-  texto: Type,
-  numero: Hash,
-  fecha: Calendar,
-  booleano: ToggleLeft,
-  tabla: Table2,
-};
 
 function formatValue(value: PrimitiveValue | null | undefined): string {
   if (value === null || value === undefined || value === "") return "—";
@@ -105,9 +87,14 @@ export function DocumentTypeConfigPage() {
   const [saved, setSaved] = useState(false);
   const prefilledRef = useRef(false);
 
-  const [leftWidth, setLeftWidth] = useState(42); // porcentaje del panel izquierdo
-  const [isDragging, setIsDragging] = useState(false);
-  const splitRef = useRef<HTMLDivElement>(null);
+  const {
+    size: leftWidth,
+    isDragging,
+    containerRef: splitRef,
+    onPointerDown: handleSplitPointerDown,
+    onPointerMove: handleSplitPointerMove,
+    onPointerUp: handleSplitPointerUp,
+  } = useResizableSplit({ mode: "percentage", initial: 42, min: 20, max: 70 });
 
   const [documentId, setDocumentId] = useState<string>();
   const { data: previewDoc } = useDocument(documentId);
@@ -205,24 +192,6 @@ export function DocumentTypeConfigPage() {
   };
 
   const previewKind = previewDoc ? guessPreviewKind(previewDoc.original_filename) : null;
-
-  const handleSplitPointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.preventDefault();
-    e.currentTarget.setPointerCapture(e.pointerId);
-    setIsDragging(true);
-  };
-
-  const handleSplitPointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
-    if (!isDragging || !splitRef.current) return;
-    const rect = splitRef.current.getBoundingClientRect();
-    const pct = ((e.clientX - rect.left) / rect.width) * 100;
-    setLeftWidth(Math.min(70, Math.max(20, pct)));
-  };
-
-  const handleSplitPointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
-    e.currentTarget.releasePointerCapture(e.pointerId);
-    setIsDragging(false);
-  };
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%", background: "var(--bg)" }}>

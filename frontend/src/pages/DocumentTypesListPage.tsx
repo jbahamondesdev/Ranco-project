@@ -10,24 +10,9 @@ import {
   Trash2,
 } from "lucide-react";
 import { useDeleteDocumentType, useDocumentTypes } from "../api/documentTypes";
+import { extractErrorMessage } from "../api/errors";
 import { Spinner } from "../components/common/Spinner";
 import type { DocumentType } from "../api/types";
-
-function extractErrorMessage(err: unknown): string {
-  if (err instanceof Error) {
-    const match = err.message.match(/:\s*(\{.*\})\s*$/);
-    if (match) {
-      try {
-        const parsed = JSON.parse(match[1]);
-        if (typeof parsed.detail === "string") return parsed.detail;
-      } catch {
-        /* el cuerpo no era JSON, se usa el mensaje crudo */
-      }
-    }
-    return err.message;
-  }
-  return "No se pudo eliminar el tipo de documento.";
-}
 
 export function DocumentTypesListPage() {
   const { data: types, isLoading } = useDocumentTypes();
@@ -40,7 +25,7 @@ export function DocumentTypesListPage() {
     try {
       await deleteDocumentType.mutateAsync(t.id);
     } catch (err) {
-      window.alert(extractErrorMessage(err));
+      window.alert(extractErrorMessage(err, "No se pudo eliminar el tipo de documento."));
     }
   };
 

@@ -1,13 +1,13 @@
 import mimetypes
 import uuid
 
-from fastapi import APIRouter, Depends, HTTPException, UploadFile
+from fastapi import APIRouter, Depends, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.config import get_settings
-from app.db import get_by_public_id, get_db
+from app.db import get_db, get_or_404
 from app.models.document import Document
 from app.schemas.document import DocumentOut
 
@@ -56,17 +56,13 @@ def upload_document(
 
 @router.get("/{document_id}", response_model=DocumentOut)
 def get_document(document_id: str, db: Session = Depends(get_db)):
-    document = get_by_public_id(db, Document, document_id)
-    if not document:
-        raise HTTPException(404, "Documento no encontrado")
+    document = get_or_404(db, Document, document_id, "Documento no encontrado")
     return _document_out(document)
 
 
 @router.get("/{document_id}/file")
 def get_document_file(document_id: str, db: Session = Depends(get_db)):
-    document = get_by_public_id(db, Document, document_id)
-    if not document:
-        raise HTTPException(404, "Documento no encontrado")
+    document = get_or_404(db, Document, document_id, "Documento no encontrado")
     media_type = mimetypes.guess_type(document.original_filename)[0] or "application/octet-stream"
     return FileResponse(
         document.storage_path,

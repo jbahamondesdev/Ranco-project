@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db import get_by_public_id, get_db
+from app.db import get_by_public_id, get_db, get_or_404
 from app.models.document import Document
 from app.models.document_type import DocumentType, DocumentTypeVersion
 from app.models.execution import Execution
@@ -70,9 +70,7 @@ def create_document_type(payload: DocumentTypeCreate, db: Session = Depends(get_
 
 @router.get("/{document_type_id}", response_model=DocumentTypeDetailOut)
 def get_document_type(document_type_id: str, db: Session = Depends(get_db)):
-    doc_type = get_by_public_id(db, DocumentType, document_type_id)
-    if not doc_type:
-        raise HTTPException(404, "Tipo de documento no encontrado")
+    doc_type = get_or_404(db, DocumentType, document_type_id, "Tipo de documento no encontrado")
     return _document_type_detail_out(doc_type)
 
 
@@ -80,9 +78,7 @@ def get_document_type(document_type_id: str, db: Session = Depends(get_db)):
 def update_document_type(
     document_type_id: str, payload: DocumentTypeUpdate, db: Session = Depends(get_db)
 ):
-    doc_type = get_by_public_id(db, DocumentType, document_type_id)
-    if not doc_type:
-        raise HTTPException(404, "Tipo de documento no encontrado")
+    doc_type = get_or_404(db, DocumentType, document_type_id, "Tipo de documento no encontrado")
 
     existing = db.scalar(select(DocumentType).where(DocumentType.name == payload.name))
     if existing and existing.id != doc_type.id:
@@ -96,9 +92,7 @@ def update_document_type(
 
 @router.delete("/{document_type_id}", status_code=204)
 def delete_document_type(document_type_id: str, db: Session = Depends(get_db)):
-    doc_type = get_by_public_id(db, DocumentType, document_type_id)
-    if not doc_type:
-        raise HTTPException(404, "Tipo de documento no encontrado")
+    doc_type = get_or_404(db, DocumentType, document_type_id, "Tipo de documento no encontrado")
 
     workflows = db.scalars(
         select(Workflow).where(Workflow.document_type_id == doc_type.id)
@@ -149,15 +143,13 @@ def delete_document_type(document_type_id: str, db: Session = Depends(get_db)):
 def create_version(
     document_type_id: str, payload: DocumentTypeVersionCreate, db: Session = Depends(get_db)
 ):
-    doc_type = get_by_public_id(db, DocumentType, document_type_id)
-    if not doc_type:
-        raise HTTPException(404, "Tipo de documento no encontrado")
+    doc_type = get_or_404(db, DocumentType, document_type_id, "Tipo de documento no encontrado")
 
     reference_document = None
     if payload.reference_document_id:
-        reference_document = get_by_public_id(db, Document, payload.reference_document_id)
-        if not reference_document:
-            raise HTTPException(404, "Documento de referencia no encontrado")
+        reference_document = get_or_404(
+            db, Document, payload.reference_document_id, "Documento de referencia no encontrado"
+        )
 
     last_version = db.scalar(
         select(DocumentTypeVersion)
@@ -185,9 +177,7 @@ def create_version(
     "/{document_type_id}/versions/{version_id}/publish", response_model=DocumentTypeVersionOut
 )
 def publish_version(document_type_id: str, version_id: str, db: Session = Depends(get_db)):
-    doc_type = get_by_public_id(db, DocumentType, document_type_id)
-    if not doc_type:
-        raise HTTPException(404, "Tipo de documento no encontrado")
+    doc_type = get_or_404(db, DocumentType, document_type_id, "Tipo de documento no encontrado")
 
     version = get_by_public_id(db, DocumentTypeVersion, version_id)
     if not version or version.document_type_id != doc_type.id:

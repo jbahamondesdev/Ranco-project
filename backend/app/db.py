@@ -1,3 +1,4 @@
+from fastapi import HTTPException
 from sqlalchemy import create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
@@ -25,6 +26,16 @@ def get_by_public_id(db: Session, model, public_id: str):
     """Busca una fila por su public_id (UUID expuesto en la API) en vez de por el id
     interno entero, que nunca se expone fuera del backend."""
     return db.scalar(select(model).where(model.public_id == public_id))
+
+
+def get_or_404(db: Session, model, public_id: str, detail: str):
+    """Como get_by_public_id, pero lanza HTTPException(404, detail) si no existe.
+    Ahorra repetir el if/raise en cada router para el caso comun de "buscar por
+    public_id o devolver 404"."""
+    obj = get_by_public_id(db, model, public_id)
+    if not obj:
+        raise HTTPException(404, detail)
+    return obj
 
 
 def ensure_database_exists() -> None:

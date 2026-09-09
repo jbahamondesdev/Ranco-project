@@ -23,26 +23,8 @@ import {
   useResumeWorkflow,
   useWorkflows,
 } from "../api/workflows";
+import { displayExecutionStatus } from "../workflow/executionStatus";
 import type { Execution, Workflow } from "../api/types";
-
-const STATUS_BADGE: Record<string, string> = {
-  pending: "badge-progress",
-  extracting: "badge-progress",
-  mapping: "badge-progress",
-  validating: "badge-progress",
-  needs_review: "badge-warning",
-  completed: "badge-success",
-  error: "badge-danger",
-};
-
-// una ejecución en needs_review que ya no tiene campos sin resolver se muestra como
-// resuelta en vez de seguir pareciendo un problema pendiente
-function executionStatusBadge(exec: Execution): { label: string; cls: string } {
-  if (exec.status === "needs_review" && !exec.has_unresolved_issues) {
-    return { label: "resuelta", cls: "badge-success" };
-  }
-  return { label: exec.status, cls: STATUS_BADGE[exec.status] ?? "" };
-}
 
 function WorkflowHistoryPanel({ workflow }: { workflow: Workflow }) {
   const { data: executions } = useExecutions({ workflowId: workflow.id });
@@ -94,7 +76,10 @@ function WorkflowHistoryPanel({ workflow }: { workflow: Workflow }) {
               <tr key={exec.id}>
                 <td style={{ fontFamily: "monospace", fontSize: 11 }}>{exec.id}</td>
                 <td>
-                  <span className={`badge ${executionStatusBadge(exec).cls}`}>{executionStatusBadge(exec).label}</span>
+                  {(() => {
+                    const status = displayExecutionStatus(exec.status, exec.has_unresolved_issues);
+                    return <span className={`badge ${status.badgeClass}`}>{status.label}</span>;
+                  })()}
                 </td>
                 <td>{new Date(exec.started_at).toLocaleString()}</td>
                 <td>

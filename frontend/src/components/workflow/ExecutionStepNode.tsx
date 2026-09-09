@@ -1,6 +1,6 @@
 import type { NodeProps, Node } from "@xyflow/react";
 import { AlertTriangle, CheckCircle2, Circle, Loader2, XCircle } from "lucide-react";
-import { NodeShell, type Tone } from "./WorkflowNodes";
+import { NodeShell, type Tone } from "./nodes";
 
 export type ExecutionNodeStatus = "done" | "active" | "error" | "pending" | "warning";
 

@@ -7,15 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 
 # pending -> extracting -> mapping -> validating -> (needs_review | completed) | error
-EXECUTION_STATUSES = (
-    "pending",
-    "extracting",
-    "mapping",
-    "validating",
-    "needs_review",
-    "completed",
-    "error",
-)
 
 
 class Execution(Base):

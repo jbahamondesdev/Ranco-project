@@ -1,7 +1,7 @@
 """Borra todos los datos de la base (tipos de documento, documentos, ejecuciones, etc.)
 y los archivos en storage/, dejando la app en estado limpio. No borra el esquema.
 
-Uso: uv run python -m app.reset_data
+Uso: uv run python -m app.scripts.reset_data
 """
 
 import shutil

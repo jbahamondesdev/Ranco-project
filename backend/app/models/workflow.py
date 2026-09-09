@@ -7,7 +7,6 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db import Base
 
 # active: corre normalmente | paused: no se puede ejecutar hasta reanudar
-WORKFLOW_STATUSES = ("active", "paused")
 
 
 class Workflow(Base):

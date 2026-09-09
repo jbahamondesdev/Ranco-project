@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import get_by_public_id, get_db
+from app.db import get_db, get_or_404
 from app.models.document_type import DocumentType
 from app.models.execution import Execution, ExecutionEvent, ExtractionResult, MappedField
 from app.models.workflow import Workflow
@@ -28,10 +28,7 @@ def _workflow_out(workflow: Workflow) -> dict:
 def _resolve_document_type_id(db: Session, public_id: str | None) -> int | None:
     if not public_id:
         return None
-    doc_type = get_by_public_id(db, DocumentType, public_id)
-    if not doc_type:
-        raise HTTPException(404, "Tipo de documento no encontrado")
-    return doc_type.id
+    return get_or_404(db, DocumentType, public_id, "Tipo de documento no encontrado").id
 
 
 @router.get("", response_model=list[WorkflowOut])
@@ -59,17 +56,13 @@ def create_workflow(payload: WorkflowCreate, db: Session = Depends(get_db)):
 
 @router.get("/{workflow_id}", response_model=WorkflowOut)
 def get_workflow(workflow_id: str, db: Session = Depends(get_db)):
-    workflow = get_by_public_id(db, Workflow, workflow_id)
-    if not workflow:
-        raise HTTPException(404, "Flujo no encontrado")
+    workflow = get_or_404(db, Workflow, workflow_id, "Flujo no encontrado")
     return _workflow_out(workflow)
 
 
 @router.patch("/{workflow_id}", response_model=WorkflowOut)
 def update_workflow(workflow_id: str, payload: WorkflowUpdate, db: Session = Depends(get_db)):
-    workflow = get_by_public_id(db, Workflow, workflow_id)
-    if not workflow:
-        raise HTTPException(404, "Flujo no encontrado")
+    workflow = get_or_404(db, Workflow, workflow_id, "Flujo no encontrado")
 
     existing = db.scalar(select(Workflow).where(Workflow.name == payload.name))
     if existing and existing.id != workflow.id:
@@ -87,9 +80,7 @@ def update_workflow(workflow_id: str, payload: WorkflowUpdate, db: Session = Dep
 
 @router.post("/{workflow_id}/pause", response_model=WorkflowOut)
 def pause_workflow(workflow_id: str, db: Session = Depends(get_db)):
-    workflow = get_by_public_id(db, Workflow, workflow_id)
-    if not workflow:
-        raise HTTPException(404, "Flujo no encontrado")
+    workflow = get_or_404(db, Workflow, workflow_id, "Flujo no encontrado")
     workflow.status = "paused"
     db.commit()
     db.refresh(workflow)
@@ -98,9 +89,7 @@ def pause_workflow(workflow_id: str, db: Session = Depends(get_db)):
 
 @router.post("/{workflow_id}/resume", response_model=WorkflowOut)
 def resume_workflow(workflow_id: str, db: Session = Depends(get_db)):
-    workflow = get_by_public_id(db, Workflow, workflow_id)
-    if not workflow:
-        raise HTTPException(404, "Flujo no encontrado")
+    workflow = get_or_404(db, Workflow, workflow_id, "Flujo no encontrado")
     workflow.status = "active"
     db.commit()
     db.refresh(workflow)
@@ -109,9 +98,7 @@ def resume_workflow(workflow_id: str, db: Session = Depends(get_db)):
 
 @router.delete("/{workflow_id}", status_code=204)
 def delete_workflow(workflow_id: str, db: Session = Depends(get_db)):
-    workflow = get_by_public_id(db, Workflow, workflow_id)
-    if not workflow:
-        raise HTTPException(404, "Flujo no encontrado")
+    workflow = get_or_404(db, Workflow, workflow_id, "Flujo no encontrado")
 
     execution_ids = list(
         db.scalars(select(Execution.id).where(Execution.workflow_id == workflow.id)).all()

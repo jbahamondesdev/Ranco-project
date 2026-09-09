@@ -1,20 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import {
-  ReactFlow,
-  Background,
-  Controls,
-  MarkerType,
-  useNodesState,
-  type Edge,
-  type NodeChange,
-} from "@xyflow/react";
+import { ReactFlow, Background, Controls, useNodesState, type NodeChange } from "@xyflow/react";
 import "@xyflow/react/dist/style.css";
 import { ArrowLeft, CheckCircle2, Loader2, Play, Save } from "lucide-react";
 import { useDocumentType, useDocumentTypes } from "../api/documentTypes";
 import { useUploadDocument } from "../api/documents";
 import { useCreateExecution } from "../api/executions";
 import { useCreateWorkflow, useUpdateWorkflow, useWorkflow } from "../api/workflows";
+import { extractErrorMessage } from "../api/errors";
 import type { FieldDefinition, WorkflowFieldThreshold, WorkflowTriggerType } from "../api/types";
 import {
   DestinationNode,
@@ -26,7 +19,8 @@ import {
   type TriggerNodeType,
   type TriggerRunStatus,
   type ValidationNodeType,
-} from "../components/workflow/WorkflowNodes";
+} from "../components/workflow/nodes";
+import { FIXED_EDGES, INITIAL_POSITIONS } from "../workflow/graph";
 import { clearWorkflowLayout, loadWorkflowLayout, saveWorkflowLayout } from "../utils/workflowLayout";
 
 const nodeTypes = {
@@ -37,38 +31,6 @@ const nodeTypes = {
 };
 
 type FlowNode = TriggerNodeType | DocumentTypeNodeType | ValidationNodeType | DestinationNodeType;
-
-const EDGE_STYLE = { stroke: "var(--text-muted)", strokeWidth: 2 };
-const EDGE_MARKER = { type: MarkerType.ArrowClosed, color: "var(--text-muted)", width: 18, height: 18 };
-
-const FIXED_EDGES: Edge[] = [
-  { id: "e1-2", source: "trigger", target: "documentType", style: EDGE_STYLE, markerEnd: EDGE_MARKER },
-  { id: "e2-3", source: "documentType", target: "validation", style: EDGE_STYLE, markerEnd: EDGE_MARKER },
-  { id: "e3-4", source: "validation", target: "destination", style: EDGE_STYLE, markerEnd: EDGE_MARKER },
-];
-
-const INITIAL_POSITIONS: Record<string, { x: number; y: number }> = {
-  trigger: { x: 20, y: 60 },
-  documentType: { x: 320, y: 40 },
-  validation: { x: 620, y: 40 },
-  destination: { x: 920, y: 60 },
-};
-
-function extractErrorMessage(err: unknown): string {
-  if (err instanceof Error) {
-    const match = err.message.match(/:\s*(\{.*\})\s*$/);
-    if (match) {
-      try {
-        const parsed = JSON.parse(match[1]);
-        if (typeof parsed.detail === "string") return parsed.detail;
-      } catch {
-        /* el cuerpo no era JSON, se usa el mensaje crudo */
-      }
-    }
-    return err.message;
-  }
-  return "No se pudo ejecutar el flujo.";
-}
 
 export function WorkflowEditorPage() {
   const { id } = useParams();
@@ -270,7 +232,7 @@ export function WorkflowEditorPage() {
       navigate(`/workflows/${id}/ejecuciones/${execution.id}`);
     } catch (err) {
       setRunStatus("error");
-      setRunError(extractErrorMessage(err));
+      setRunError(extractErrorMessage(err, "No se pudo ejecutar el flujo."));
     }
   };
 

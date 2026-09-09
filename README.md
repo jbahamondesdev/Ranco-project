@@ -21,11 +21,12 @@ cd backend
 uv sync                          # instala dependencias en .venv
 cp .env.example .env             # completa AZURE_DI_*, AZURE_OPENAI_* con tus credenciales
 uv run alembic upgrade head      # crea la base RancoDocExtract (si no existe) y las tablas
-uv run python -m app.seed        # crea el tipo de documento de ejemplo "Factura Simple"
 uv run uvicorn app.main:app --reload --port 8000
 ```
 
-La API queda en `http://localhost:8000` (`/health` para verificar la conexión a SQL Server).
+La API queda en `http://localhost:8000` (`/health` para verificar la conexión a SQL Server). No hay datos de ejemplo precargados: crea el primer tipo de documento desde la UI (`/tipos-documento/nuevo`).
+
+Para borrar todos los datos y archivos y dejar la app en estado limpio: `uv run python -m app.scripts.reset_data`.
 
 ### Variables de entorno (`backend/.env`)
 
@@ -53,8 +54,8 @@ La app queda en `http://localhost:5173` y espera el backend en `http://localhost
 
 La página de inicio (`/`) explica los 3 pasos con contadores en vivo. En resumen:
 
-1. **Configurar tipos** → abre "Factura Simple" (ya viene sembrado y publicado), o crea uno nuevo: sube un documento de referencia a la izquierda y chatea con el asistente a la derecha para definir los campos (incluye tablas) — revisa/edita tipo de dato y obligatoriedad antes de guardar.
-2. **Procesar documento** → sube un archivo, elige el tipo "Factura Simple" y presiona "Procesar documento". Ahí mismo se ve el avance del pipeline (Ingesta → Extracción → Mapeo → Validación → Resultado).
+1. **Configurar tipos** → crea uno nuevo desde `/tipos-documento/nuevo`: sube un documento de referencia a la izquierda y chatea con el asistente a la derecha para definir los campos (incluye tablas) — revisa/edita tipo de dato y obligatoriedad, guarda y publica.
+2. **Procesar documento** → sube un archivo, elige el tipo que acabas de publicar y presiona "Procesar documento". Ahí mismo se ve el avance del pipeline (Ingesta → Extracción → Mapeo → Validación → Resultado).
 3. **Seguimiento** → historial completo de ejecuciones, con el mismo avance visual y el detalle técnico de cada etapa.
 4. **Revisión** → si algún campo queda con baja confianza o falta uno obligatorio, aparece acá para corregirlo manualmente.
 

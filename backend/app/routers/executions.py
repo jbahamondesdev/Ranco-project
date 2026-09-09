@@ -6,7 +6,7 @@ from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db import SessionLocal, get_by_public_id, get_db
+from app.db import SessionLocal, get_by_public_id, get_db, get_or_404
 from app.models.document import Document
 from app.models.document_type import DocumentTypeVersion
 from app.models.execution import Execution, ExecutionEvent, MappedField
@@ -112,9 +112,7 @@ def list_executions(
     if status:
         query = query.where(Execution.status == status)
     if workflow_id is not None:
-        workflow = get_by_public_id(db, Workflow, workflow_id)
-        if not workflow:
-            raise HTTPException(404, "Flujo no encontrado")
+        workflow = get_or_404(db, Workflow, workflow_id, "Flujo no encontrado")
         query = query.where(Execution.workflow_id == workflow.id)
     if has_issues:
         query = query.where(Execution.id.in_(_executions_with_issues_query()))
@@ -145,9 +143,7 @@ def get_execution(execution_id: str, db: Session = Depends(get_db)):
     # la marcaba como vista antes de que el usuario tuviera oportunidad de notarlo en
     # Revision. Ver POST /{execution_id}/mark-seen, que el frontend llama solo cuando
     # abre una ejecucion que YA estaba terminada al momento de entrar.
-    execution = get_by_public_id(db, Execution, execution_id)
-    if not execution:
-        raise HTTPException(404, "Ejecución no encontrada")
+    execution = get_or_404(db, Execution, execution_id, "Ejecución no encontrada")
 
     document = execution.document
     version = execution.document_type_version
@@ -198,17 +194,13 @@ def get_execution(execution_id: str, db: Session = Depends(get_db)):
 def create_execution(
     payload: ExecutionCreate, background_tasks: BackgroundTasks, db: Session = Depends(get_db)
 ):
-    document = get_by_public_id(db, Document, payload.document_id)
-    if not document:
-        raise HTTPException(404, "Documento no encontrado")
+    document = get_or_404(db, Document, payload.document_id, "Documento no encontrado")
 
     workflow: Workflow | None = None
     document_type_id = document.document_type_id
 
     if payload.workflow_id is not None:
-        workflow = get_by_public_id(db, Workflow, payload.workflow_id)
-        if not workflow:
-            raise HTTPException(404, "Flujo no encontrado")
+        workflow = get_or_404(db, Workflow, payload.workflow_id, "Flujo no encontrado")
         if workflow.status != "active":
             raise HTTPException(409, "El flujo está pausado")
         if not workflow.document_type_id:
@@ -237,9 +229,7 @@ def create_execution(
 
 @router.post("/{execution_id}/mark-seen", response_model=ExecutionOut)
 def mark_execution_seen(execution_id: str, db: Session = Depends(get_db)):
-    execution = get_by_public_id(db, Execution, execution_id)
-    if not execution:
-        raise HTTPException(404, "Ejecución no encontrada")
+    execution = get_or_404(db, Execution, execution_id, "Ejecución no encontrada")
 
     if not execution.seen:
         execution.seen = True
@@ -254,9 +244,7 @@ def mark_execution_seen(execution_id: str, db: Session = Depends(get_db)):
 def resolve_mapped_field(
     execution_id: str, field_id: str, payload: ResolveMappedFieldRequest, db: Session = Depends(get_db)
 ):
-    execution = get_by_public_id(db, Execution, execution_id)
-    if not execution:
-        raise HTTPException(404, "Ejecución no encontrada")
+    execution = get_or_404(db, Execution, execution_id, "Ejecución no encontrada")
 
     field = get_by_public_id(db, MappedField, field_id)
     if not field or field.execution_id != execution.id:
