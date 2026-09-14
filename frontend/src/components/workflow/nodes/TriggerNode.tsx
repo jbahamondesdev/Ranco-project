@@ -1,14 +1,12 @@
 import { useRef, useState } from "react";
-import type { NodeProps, Node } from "@xyflow/react";
 import { CheckCircle2, Loader2, UploadCloud } from "lucide-react";
 import type { WorkflowTriggerType } from "../../../api/types";
-import { NodeShell } from "./NodeShell";
 import { fieldControlStyle, fieldLabelStyle } from "./styles";
 
 // --- 1. Disparo: cargar documentos ---
 export type TriggerRunStatus = "idle" | "running" | "done" | "error";
 
-export interface TriggerNodeData extends Record<string, unknown> {
+export interface TriggerNodeData {
   triggerType: WorkflowTriggerType;
   onTriggerTypeChange: (t: WorkflowTriggerType) => void;
   canRun: boolean;
@@ -19,9 +17,8 @@ export interface TriggerNodeData extends Record<string, unknown> {
   runError?: string;
   lastExecutionId?: string;
 }
-export type TriggerNodeType = Node<TriggerNodeData, "trigger">;
 
-export function TriggerNode({ data }: NodeProps<TriggerNodeType>) {
+export function TriggerNode({ data }: { data: TriggerNodeData }) {
   const [dragOver, setDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const active = data.canRun && data.runStatus !== "running";
@@ -32,10 +29,9 @@ export function TriggerNode({ data }: NodeProps<TriggerNodeType>) {
   };
 
   return (
-    <NodeShell icon={<UploadCloud size={15} />} tone="primary" step={1} title="Cargar documentos" showTarget={false}>
+    <>
       <label style={fieldLabelStyle}>Origen de los documentos</label>
       <select
-        className="nodrag"
         value={data.triggerType}
         onChange={(e) => data.onTriggerTypeChange(e.target.value as WorkflowTriggerType)}
         style={{ ...fieldControlStyle, marginBottom: 10 }}
@@ -59,7 +55,6 @@ export function TriggerNode({ data }: NodeProps<TriggerNodeType>) {
             <p style={{ margin: "0 0 8px", fontSize: 11, color: "var(--warning)" }}>{data.disabledReason}</p>
           )}
           <div
-            className="nodrag"
             onClick={() => active && fileInputRef.current?.click()}
             onDragOver={(e) => {
               e.preventDefault();
@@ -121,6 +116,6 @@ export function TriggerNode({ data }: NodeProps<TriggerNodeType>) {
           )}
         </>
       )}
-    </NodeShell>
+    </>
   );
 }

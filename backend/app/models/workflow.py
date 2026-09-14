@@ -22,8 +22,10 @@ class Workflow(Base):
     document_type_id: Mapped[int | None] = mapped_column(
         ForeignKey("document_types.id"), nullable=True
     )
-    # por ahora el unico destino soportado es la base de datos interna
+    # internal_db (default) | webhook - ver destination_config para la config del webhook
     destination: Mapped[str] = mapped_column(String(50), default="internal_db")
+    # config especifica del destino - hoy solo se usa para webhook: {"url": "https://..."}
+    destination_config: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     # umbrales min/max por campo, definidos para este flujo especifico (no para el tipo
     # de documento): {nombre_campo: {"min": str|None, "max": str|None}}
     field_thresholds: Mapped[dict] = mapped_column(JSON, default=dict)

@@ -1,10 +1,9 @@
-import type { NodeProps, Node } from "@xyflow/react";
 import { AlertTriangle, CheckCircle2, Circle, Loader2, XCircle } from "lucide-react";
 import { NodeShell, type Tone } from "./nodes";
 
 export type ExecutionNodeStatus = "done" | "active" | "error" | "pending" | "warning";
 
-export interface ExecutionStepNodeData extends Record<string, unknown> {
+export interface ExecutionStepNodeData {
   icon: React.ReactNode;
   tone: Tone;
   step: number;
@@ -13,10 +12,7 @@ export interface ExecutionStepNodeData extends Record<string, unknown> {
   summary: string;
   selected: boolean;
   onSelect: () => void;
-  showTarget?: boolean;
-  showSource?: boolean;
 }
-export type ExecutionStepNodeType = Node<ExecutionStepNodeData, "executionStep">;
 
 const STATUS_META: Record<ExecutionNodeStatus, { icon: React.ReactNode; color: string; label: string }> = {
   done: { icon: <CheckCircle2 size={13} />, color: "var(--success)", label: "Completado" },
@@ -26,7 +22,7 @@ const STATUS_META: Record<ExecutionNodeStatus, { icon: React.ReactNode; color: s
   pending: { icon: <Circle size={13} />, color: "var(--text-muted)", label: "Pendiente" },
 };
 
-export function ExecutionStepNode({ data }: NodeProps<ExecutionStepNodeType>) {
+export function ExecutionStepNode({ data }: { data: ExecutionStepNodeData }) {
   const meta = STATUS_META[data.status];
 
   return (
@@ -35,6 +31,7 @@ export function ExecutionStepNode({ data }: NodeProps<ExecutionStepNodeType>) {
       style={{
         position: "relative",
         borderRadius: 16,
+        cursor: "pointer",
         outline: data.selected ? "2px solid var(--primary)" : "2px solid transparent",
         outlineOffset: 3,
         transition: "outline-color 0.12s",
@@ -59,15 +56,7 @@ export function ExecutionStepNode({ data }: NodeProps<ExecutionStepNodeType>) {
       >
         {meta.icon}
       </div>
-      <NodeShell
-        icon={data.icon}
-        tone={data.tone}
-        step={data.step}
-        title={data.title}
-        showTarget={data.showTarget}
-        showSource={data.showSource}
-        cursor="pointer"
-      >
+      <NodeShell icon={data.icon} tone={data.tone} step={data.step} title={data.title}>
         <div style={{ display: "flex", alignItems: "center", gap: 6, color: meta.color, fontSize: 12, fontWeight: 700 }}>
           {meta.label}
         </div>

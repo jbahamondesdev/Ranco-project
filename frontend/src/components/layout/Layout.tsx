@@ -1,5 +1,5 @@
 import { Link, NavLink, Outlet } from "react-router-dom";
-import { AlertTriangle, ChevronDown, Layers, Settings2, Workflow } from "lucide-react";
+import { AlertTriangle, BarChart3, ChevronDown, Layers, Settings2, Workflow } from "lucide-react";
 import { useRole } from "../../state/role";
 import { useUnseenIssuesCount } from "../../api/executions";
 import type { Role } from "../../api/types";
@@ -24,6 +24,13 @@ const NAV_ITEMS: { to: string; label: string; subtitle: string; icon: typeof Set
     label: "Revisión",
     subtitle: "Ejecuciones con baja confianza que requieren atención",
     icon: AlertTriangle,
+    roles: ["admin", "operador", "revisor"],
+  },
+  {
+    to: "/dashboard",
+    label: "Dashboard",
+    subtitle: "Métricas agregadas del pipeline",
+    icon: BarChart3,
     roles: ["admin", "operador", "revisor"],
   },
 ];

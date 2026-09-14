@@ -8,43 +8,51 @@ _SIMPLE_TYPE = {
     "fecha": "string",
     "numero": "number",
     "booleano": "boolean",
+    "porcentaje": "number",
 }
 
 
 def _column_property(column: dict) -> dict:
     json_type = _SIMPLE_TYPE.get(column["data_type"], "string")
-    return {"type": [json_type, "null"]}
+    prop: dict = {"type": [json_type, "null"]}
+    if column.get("description"):
+        prop["description"] = column["description"]
+    return prop
 
 
 def _field_property(field: dict) -> dict:
+    # `description`, cuando el usuario la definio (ver FieldDefinition.description), se
+    # pasa tal cual como la "description" JSON Schema de la propiedad - es el mecanismo
+    # estandar de Structured Outputs para dar contexto puntual por campo sin tocar el
+    # prompt general (ver MAPPING_SYSTEM_PROMPT en pipeline/mapping.py).
     if field["data_type"] == "tabla":
         columns = field.get("columns") or []
         column_names = [c["name"] for c in columns]
+        rows_schema: dict = {
+            "type": "array",
+            "items": {
+                "type": "object",
+                "properties": {c["name"]: _column_property(c) for c in columns},
+                "required": column_names,
+                "additionalProperties": False,
+            },
+        }
+        if field.get("description"):
+            rows_schema["description"] = field["description"]
         return {
             "type": "object",
-            "properties": {
-                "rows": {
-                    "type": "array",
-                    "items": {
-                        "type": "object",
-                        "properties": {c["name"]: _column_property(c) for c in columns},
-                        "required": column_names,
-                        "additionalProperties": False,
-                    },
-                },
-                "confidence": {"type": "number"},
-            },
+            "properties": {"rows": rows_schema, "confidence": {"type": "number"}},
             "required": ["rows", "confidence"],
             "additionalProperties": False,
         }
 
     json_type = _SIMPLE_TYPE.get(field["data_type"], "string")
+    value_schema: dict = {"type": [json_type, "null"]}
+    if field.get("description"):
+        value_schema["description"] = field["description"]
     return {
         "type": "object",
-        "properties": {
-            "value": {"type": [json_type, "null"]},
-            "confidence": {"type": "number"},
-        },
+        "properties": {"value": value_schema, "confidence": {"type": "number"}},
         "required": ["value", "confidence"],
         "additionalProperties": False,
     }

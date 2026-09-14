@@ -2,8 +2,10 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import {
   Ban,
+  CheckCircle2,
   ChevronDown,
   ChevronRight,
+  Download,
   History,
   Pencil,
   Play,
@@ -11,12 +13,14 @@ import {
   PlayCircle,
   Trash2,
   Workflow as WorkflowIcon,
+  XCircle,
 } from "lucide-react";
 import { api } from "../api/client";
 import { useDocumentTypes } from "../api/documentTypes";
 import { Spinner } from "../components/common/Spinner";
 import { useUploadDocument } from "../api/documents";
-import { useCreateExecution, useExecutions } from "../api/executions";
+import { extractErrorMessage } from "../api/errors";
+import { getWorkflowExportUrl, useCreateExecution, useExecutions } from "../api/executions";
 import {
   useDeleteWorkflow,
   usePauseWorkflow,
@@ -26,17 +30,37 @@ import {
 import { displayExecutionStatus } from "../workflow/executionStatus";
 import type { Execution, Workflow } from "../api/types";
 
+type UploadQueueItem = {
+  file: File;
+  status: "pending" | "uploading" | "done" | "error";
+  error?: string;
+};
+
 function WorkflowHistoryPanel({ workflow }: { workflow: Workflow }) {
   const { data: executions } = useExecutions({ workflowId: workflow.id });
   const uploadDocument = useUploadDocument();
   const createExecution = useCreateExecution();
+  const [queue, setQueue] = useState<UploadQueueItem[]>([]);
 
-  const handleRun = async (file: File) => {
-    const doc = await uploadDocument.mutateAsync(file);
-    await createExecution.mutateAsync({ documentId: doc.id, workflowId: workflow.id });
+  // procesa los archivos de a uno (no en paralelo): evita saturar el pipeline local
+  // (SQL Server Express + llamadas a Azure) cuando se sueltan varios archivos a la vez
+  const handleFiles = async (files: FileList) => {
+    const items: UploadQueueItem[] = Array.from(files).map((file) => ({ file, status: "pending" }));
+    setQueue(items);
+    for (let i = 0; i < items.length; i++) {
+      setQueue((q) => q.map((it, idx) => (idx === i ? { ...it, status: "uploading" } : it)));
+      try {
+        const doc = await uploadDocument.mutateAsync(items[i].file);
+        await createExecution.mutateAsync({ documentId: doc.id, workflowId: workflow.id });
+        setQueue((q) => q.map((it, idx) => (idx === i ? { ...it, status: "done" } : it)));
+      } catch (err) {
+        const message = extractErrorMessage(err, "Error desconocido");
+        setQueue((q) => q.map((it, idx) => (idx === i ? { ...it, status: "error", error: message } : it)));
+      }
+    }
   };
 
-  const isRunning = uploadDocument.isPending || createExecution.isPending;
+  const isRunning = queue.some((it) => it.status === "pending" || it.status === "uploading");
 
   return (
     <div style={{ padding: "14px 18px", borderTop: "1px solid var(--border)", background: "var(--bg)" }}>
@@ -44,20 +68,48 @@ function WorkflowHistoryPanel({ workflow }: { workflow: Workflow }) {
         <span style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 13, fontWeight: 600 }}>
           <History size={15} /> Historial de ejecuciones
         </span>
+        <div style={{ display: "flex", gap: 8 }}>
+          {executions && executions.length > 0 && (
+            <a
+              href={getWorkflowExportUrl(workflow.id)}
+              className="btn"
+              style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}
+            >
+              <Download size={13} /> Exportar CSV
+            </a>
+          )}
         {workflow.status === "active" ? (
           <label className="btn btn-primary" style={{ fontSize: 12, cursor: "pointer" }}>
             <Play size={13} /> {isRunning ? "Ejecutando..." : "Ejecutar"}
             <input
               type="file"
+              multiple
               style={{ display: "none" }}
               disabled={isRunning}
-              onChange={(e) => e.target.files?.[0] && handleRun(e.target.files[0])}
+              onChange={(e) => e.target.files && e.target.files.length > 0 && handleFiles(e.target.files)}
             />
           </label>
         ) : (
           <span style={{ fontSize: 12, color: "var(--text-muted)" }}>Flujo pausado — reanúdalo para ejecutar</span>
         )}
+        </div>
       </div>
+
+      {queue.length > 0 && (
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, marginBottom: 12 }}>
+          {queue.map((item, i) => (
+            <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+              {item.status === "done" && <CheckCircle2 size={13} color="var(--success)" />}
+              {item.status === "error" && <XCircle size={13} color="var(--danger)" />}
+              {(item.status === "pending" || item.status === "uploading") && <Spinner size={13} />}
+              <span style={{ flex: 1, minWidth: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                {item.file.name}
+              </span>
+              {item.status === "error" && <span style={{ color: "var(--danger)" }}>{item.error}</span>}
+            </div>
+          ))}
+        </div>
+      )}
 
       {!executions || executions.length === 0 ? (
         <p style={{ fontSize: 13, color: "var(--text-muted)", margin: 0 }}>Todavía no hay ejecuciones para este flujo.</p>

@@ -1,23 +1,19 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ReactFlow, Background, Controls } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
 import { ArrowLeft, Database, FileCheck2, FileText, UploadCloud } from "lucide-react";
 import { TERMINAL_STATUSES, useExecution, useMarkExecutionSeen } from "../api/executions";
 import { useWorkflow } from "../api/workflows";
-import { loadWorkflowLayout } from "../utils/workflowLayout";
 import { Spinner } from "../components/common/Spinner";
 import { NodeDetailPanel } from "../components/workflow/NodeDetailPanel";
-import {
-  ExecutionStepNode,
-  type ExecutionStepNodeType,
-} from "../components/workflow/ExecutionStepNode";
+import { ExecutionStepNode } from "../components/workflow/ExecutionStepNode";
+import { WorkflowStepper } from "../components/workflow/WorkflowStepper";
+import { OrientationToggle } from "../components/workflow/OrientationToggle";
+import { useWorkflowOrientation } from "../hooks/useWorkflowOrientation";
 import { useResizableSplit } from "../hooks/useResizableSplit";
-import { FIXED_EDGES, INITIAL_POSITIONS, type NodeId } from "../workflow/graph";
+import type { Tone } from "../components/workflow/nodes";
+import { type NodeId } from "../workflow/graph";
 import { displayExecutionStatus, hasUnresolvedIssues } from "../workflow/executionStatus";
 import { computeNodeStatuses, nodeSummary } from "../workflow/nodeStatus";
-
-const nodeTypes = { executionStep: ExecutionStepNode };
 
 const PANEL_MIN_WIDTH = 360;
 const PANEL_MAX_WIDTH = 760;
@@ -28,6 +24,7 @@ export function WorkflowExecutionPage() {
   const { data: workflow } = useWorkflow(workflowId);
   const { data: execution } = useExecution(executionId);
   const [selectedNode, setSelectedNode] = useState<NodeId>();
+  const [orientation, setOrientation] = useWorkflowOrientation();
   const {
     size: panelWidth,
     isDragging: isResizingPanel,
@@ -54,39 +51,30 @@ export function WorkflowExecutionPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [execution]);
 
-  const layout = useMemo(
-    () => (workflowId ? loadWorkflowLayout(workflowId) : null) ?? INITIAL_POSITIONS,
-    [workflowId]
-  );
-
-  const nodes: ExecutionStepNodeType[] = useMemo(() => {
+  const steps = useMemo(() => {
     if (!execution) return [];
     const statuses = computeNodeStatuses(execution);
-    const defs: { id: NodeId; icon: React.ReactNode; tone: "primary" | "accent" | "warning" | "success"; step: number; title: string; showTarget?: boolean; showSource?: boolean }[] = [
-      { id: "trigger", icon: <UploadCloud size={15} />, tone: "primary", step: 1, title: "Cargar documentos", showTarget: false },
+    const defs: { id: NodeId; icon: React.ReactNode; tone: Tone; step: number; title: string }[] = [
+      { id: "trigger", icon: <UploadCloud size={15} />, tone: "primary", step: 1, title: "Cargar documentos" },
       { id: "documentType", icon: <FileText size={15} />, tone: "accent", step: 2, title: "Tipo de documento" },
       { id: "validation", icon: <FileCheck2 size={15} />, tone: "warning", step: 3, title: "Validaciones" },
-      { id: "destination", icon: <Database size={15} />, tone: "success", step: 4, title: "Destino", showSource: false },
+      { id: "destination", icon: <Database size={15} />, tone: "success", step: 4, title: "Destino" },
     ];
 
     return defs.map((d) => ({
       id: d.id,
-      type: "executionStep",
-      position: layout[d.id] ?? INITIAL_POSITIONS[d.id],
       data: {
         icon: d.icon,
         tone: d.tone,
         step: d.step,
         title: d.title,
-        showTarget: d.showTarget,
-        showSource: d.showSource,
         status: statuses[d.id],
         summary: nodeSummary(d.id, execution, statuses[d.id]),
         selected: selectedNode === d.id,
         onSelect: () => setSelectedNode(d.id),
       },
     }));
-  }, [execution, layout, selectedNode]);
+  }, [execution, selectedNode]);
 
   if (!execution) {
     return (
@@ -137,26 +125,19 @@ export function WorkflowExecutionPage() {
           </div>
         </div>
 
-        <div style={{ justifySelf: "end" }}>
+        <div style={{ justifySelf: "end", display: "flex", alignItems: "center", gap: 10 }}>
+          <OrientationToggle value={orientation} onChange={setOrientation} />
           <span className={`badge ${status.badgeClass}`}>{status.label}</span>
         </div>
       </div>
 
       <div ref={splitRef} style={{ flex: 1, minHeight: 0, display: "flex" }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <ReactFlow
-            nodes={nodes}
-            edges={FIXED_EDGES}
-            nodeTypes={nodeTypes}
-            nodesDraggable={false}
-            nodesConnectable={false}
-            edgesFocusable={false}
-            fitView
-            fitViewOptions={{ padding: 0.3 }}
-          >
-            <Background />
-            <Controls showInteractive={false} />
-          </ReactFlow>
+          <WorkflowStepper orientation={orientation}>
+            {steps.map((s) => (
+              <ExecutionStepNode key={s.id} data={s.data} />
+            ))}
+          </WorkflowStepper>
         </div>
 
         {selectedNode && (

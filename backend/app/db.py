@@ -1,5 +1,5 @@
 from fastapi import HTTPException
-from sqlalchemy import create_engine, select, text
+from sqlalchemy import Select, create_engine, select, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
@@ -8,6 +8,15 @@ settings = get_settings()
 
 engine = create_engine(settings.sqlalchemy_database_uri, pool_pre_ping=True)
 SessionLocal = sessionmaker(bind=engine, autoflush=False, autocommit=False)
+
+# tope de seguridad para endpoints de listado sin filtros: evita que una tabla que
+# crece sin limite (documentos, ejecuciones, etc.) se devuelva entera en un solo GET
+DEFAULT_LIST_LIMIT = 200
+MAX_LIST_LIMIT = 500
+
+
+def paginate(query: Select, limit: int = DEFAULT_LIST_LIMIT, offset: int = 0) -> Select:
+    return query.limit(min(limit, MAX_LIST_LIMIT)).offset(offset)
 
 
 class Base(DeclarativeBase):

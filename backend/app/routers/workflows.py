@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.db import get_db, get_or_404
+from app.db import DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, get_db, get_or_404, paginate
 from app.models.document_type import DocumentType
 from app.models.execution import Execution, ExecutionEvent, ExtractionResult, MappedField
 from app.models.workflow import Workflow
@@ -19,6 +19,7 @@ def _workflow_out(workflow: Workflow) -> dict:
         "trigger_type": workflow.trigger_type,
         "document_type_id": workflow.document_type.public_id if workflow.document_type_id else None,
         "destination": workflow.destination,
+        "destination_config": workflow.destination_config,
         "field_thresholds": workflow.field_thresholds,
         "created_at": workflow.created_at,
         "updated_at": workflow.updated_at,
@@ -32,8 +33,13 @@ def _resolve_document_type_id(db: Session, public_id: str | None) -> int | None:
 
 
 @router.get("", response_model=list[WorkflowOut])
-def list_workflows(db: Session = Depends(get_db)):
-    workflows = db.scalars(select(Workflow).order_by(Workflow.created_at.desc())).all()
+def list_workflows(
+    limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    query = select(Workflow).order_by(Workflow.created_at.desc())
+    workflows = db.scalars(paginate(query, limit, offset)).all()
     return [_workflow_out(w) for w in workflows]
 
 
@@ -45,6 +51,7 @@ def create_workflow(payload: WorkflowCreate, db: Session = Depends(get_db)):
         name=payload.name,
         document_type_id=_resolve_document_type_id(db, payload.document_type_id),
         destination=payload.destination,
+        destination_config=payload.destination_config,
         trigger_type=payload.trigger_type,
         field_thresholds={k: v.model_dump() for k, v in payload.field_thresholds.items()},
     )
@@ -71,6 +78,7 @@ def update_workflow(workflow_id: str, payload: WorkflowUpdate, db: Session = Dep
     workflow.name = payload.name
     workflow.document_type_id = _resolve_document_type_id(db, payload.document_type_id)
     workflow.destination = payload.destination
+    workflow.destination_config = payload.destination_config
     workflow.trigger_type = payload.trigger_type
     workflow.field_thresholds = {k: v.model_dump() for k, v in payload.field_thresholds.items()}
     db.commit()

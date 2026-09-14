@@ -7,6 +7,7 @@ import { WorkflowsListPage } from "./pages/WorkflowsListPage";
 import { WorkflowEditorPage } from "./pages/WorkflowEditorPage";
 import { WorkflowExecutionPage } from "./pages/WorkflowExecutionPage";
 import { ReviewPage } from "./pages/ReviewPage";
+import { DashboardPage } from "./pages/DashboardPage";
 
 export default function App() {
   return (
@@ -24,6 +25,7 @@ export default function App() {
           element={<WorkflowExecutionPage />}
         />
         <Route path="/revision" element={<ReviewPage />} />
+        <Route path="/dashboard" element={<DashboardPage />} />
       </Route>
     </Routes>
   );

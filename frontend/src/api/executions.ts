@@ -1,8 +1,16 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { api } from "./client";
-import type { Execution, ExecutionDetail, MappedField } from "./types";
+import { api, BASE_URL } from "./client";
+import type { Execution, ExecutionDetail, ExecutionStats, MappedField } from "./types";
 
 export const TERMINAL_STATUSES = ["completed", "error", "needs_review"];
+
+export function getExecutionExportUrl(executionId: string): string {
+  return `${BASE_URL}/executions/${executionId}/export`;
+}
+
+export function getWorkflowExportUrl(workflowId: string): string {
+  return `${BASE_URL}/executions/export?workflow_id=${workflowId}`;
+}
 
 export function useExecutions(options?: { status?: string; workflowId?: string; hasIssues?: boolean }) {
   const params = new URLSearchParams();
@@ -15,6 +23,14 @@ export function useExecutions(options?: { status?: string; workflowId?: string; 
     queryKey: ["executions", options?.status ?? "all", options?.workflowId ?? "all", options?.hasIssues ?? false],
     queryFn: () => api.get<Execution[]>(`/executions${qs ? `?${qs}` : ""}`),
     refetchInterval: 3000,
+  });
+}
+
+export function useExecutionStats() {
+  return useQuery({
+    queryKey: ["executions", "stats"],
+    queryFn: () => api.get<ExecutionStats>("/executions/stats"),
+    refetchInterval: 10000,
   });
 }
 

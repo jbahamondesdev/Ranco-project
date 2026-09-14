@@ -78,3 +78,19 @@ class ResolveMappedFieldRequest(BaseModel):
     # descarta sin modificar el valor extraido
     corrected_value: str | None = None
     role: str
+
+
+class DocumentTypeStatsOut(BaseModel):
+    document_type_id: str
+    document_type_name: str
+    total: int
+    needs_review: int
+    avg_confidence: float | None
+
+
+class ExecutionStatsOut(BaseModel):
+    total: int
+    by_status: dict[str, int]
+    avg_confidence: float | None
+    avg_duration_seconds: float | None
+    by_document_type: list[DocumentTypeStatsOut]

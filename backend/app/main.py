@@ -1,9 +1,16 @@
+import logging
+
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.db import engine
 from app.routers import chat, document_types, documents, executions, workflows
+
+# formato consistente (con timestamp) para los logger.info/warning/exception ya usados
+# en la app (chat.py, orchestrator.py) - sin esto, Python no emite nada por debajo de
+# WARNING y lo que sí emite no lleva ni fecha ni nombre del módulo de origen.
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 
 app = FastAPI(title="Plataforma de extracción y mapeo de documentos")
 

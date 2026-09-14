@@ -1,11 +1,18 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { api } from "./client";
-import type { Workflow, WorkflowDestination, WorkflowFieldThreshold, WorkflowTriggerType } from "./types";
+import type {
+  Workflow,
+  WorkflowDestination,
+  WorkflowDestinationConfig,
+  WorkflowFieldThreshold,
+  WorkflowTriggerType,
+} from "./types";
 
 export interface WorkflowPayload {
   name: string;
   document_type_id: string | null;
   destination: WorkflowDestination;
+  destination_config: WorkflowDestinationConfig | null;
   trigger_type: WorkflowTriggerType;
   field_thresholds: Record<string, WorkflowFieldThreshold>;
 }

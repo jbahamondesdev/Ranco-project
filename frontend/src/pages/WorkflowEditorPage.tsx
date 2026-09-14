@@ -1,36 +1,25 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ReactFlow, Background, Controls, useNodesState, type NodeChange } from "@xyflow/react";
-import "@xyflow/react/dist/style.css";
-import { ArrowLeft, CheckCircle2, Loader2, Play, Save } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Database, FileCheck2, FileText, Loader2, Play, Save, UploadCloud } from "lucide-react";
 import { useDocumentType, useDocumentTypes } from "../api/documentTypes";
 import { useUploadDocument } from "../api/documents";
 import { useCreateExecution } from "../api/executions";
 import { useCreateWorkflow, useUpdateWorkflow, useWorkflow } from "../api/workflows";
 import { extractErrorMessage } from "../api/errors";
-import type { FieldDefinition, WorkflowFieldThreshold, WorkflowTriggerType } from "../api/types";
-import {
-  DestinationNode,
-  DocumentTypeNode,
-  TriggerNode,
-  ValidationNode,
-  type DestinationNodeType,
-  type DocumentTypeNodeType,
-  type TriggerNodeType,
-  type TriggerRunStatus,
-  type ValidationNodeType,
-} from "../components/workflow/nodes";
-import { FIXED_EDGES, INITIAL_POSITIONS } from "../workflow/graph";
-import { clearWorkflowLayout, loadWorkflowLayout, saveWorkflowLayout } from "../utils/workflowLayout";
+import { isNumericDataType } from "../utils/dataType";
+import type { FieldDefinition, WorkflowDestination, WorkflowFieldThreshold, WorkflowTriggerType } from "../api/types";
+import type { TriggerRunStatus, Tone } from "../components/workflow/nodes";
+import { EditorStepNode } from "../components/workflow/EditorStepNode";
+import { WorkflowStepPanel } from "../components/workflow/WorkflowStepPanel";
+import { WorkflowStepper } from "../components/workflow/WorkflowStepper";
+import { OrientationToggle } from "../components/workflow/OrientationToggle";
+import { useWorkflowOrientation } from "../hooks/useWorkflowOrientation";
+import { useResizableSplit } from "../hooks/useResizableSplit";
+import type { NodeId } from "../workflow/graph";
 
-const nodeTypes = {
-  trigger: TriggerNode,
-  documentType: DocumentTypeNode,
-  validation: ValidationNode,
-  destination: DestinationNode,
-};
-
-type FlowNode = TriggerNodeType | DocumentTypeNodeType | ValidationNodeType | DestinationNodeType;
+const PANEL_MIN_WIDTH = 360;
+const PANEL_MAX_WIDTH = 760;
+const PANEL_DEFAULT_WIDTH = 460;
 
 export function WorkflowEditorPage() {
   const { id } = useParams();
@@ -49,13 +38,26 @@ export function WorkflowEditorPage() {
   const [nameError, setNameError] = useState(false);
   const [documentTypeId, setDocumentTypeId] = useState<string | null>(null);
   const [triggerType, setTriggerType] = useState<WorkflowTriggerType>("manual");
+  const [destination, setDestination] = useState<WorkflowDestination>("internal_db");
+  const [webhookUrl, setWebhookUrl] = useState("");
   const [fieldThresholds, setFieldThresholds] = useState<Record<string, WorkflowFieldThreshold>>({});
   const [saved, setSaved] = useState(false);
+  const [orientation, setOrientation] = useWorkflowOrientation();
+  const [selectedStep, setSelectedStep] = useState<NodeId>();
+  const {
+    size: panelWidth,
+    isDragging: isResizingPanel,
+    containerRef: splitRef,
+    onPointerDown: handleResizePointerDown,
+    onPointerMove: handleResizePointerMove,
+    onPointerUp: handleResizePointerUp,
+  } = useResizableSplit({ mode: "pixels", initial: PANEL_DEFAULT_WIDTH, min: PANEL_MIN_WIDTH, max: PANEL_MAX_WIDTH });
   const prefilledRef = useRef(false);
 
   const { data: selectedDocType } = useDocumentType(documentTypeId ?? undefined);
-  // Los umbrales min/max solo tienen sentido sobre valores numéricos, así que se
-  // filtran los campos (y, dentro de una tabla, las columnas) a solo tipo "numero".
+  // Los umbrales min/max solo tienen sentido sobre valores numéricos (incluye
+  // porcentaje, que tambien se guarda como numero plano - ver mapping.py), asi que
+  // se filtran los campos (y, dentro de una tabla, las columnas) a esos tipos.
   const documentTypeFields: FieldDefinition[] = useMemo(() => {
     if (!selectedDocType) return [];
     const published = [...selectedDocType.versions]
@@ -65,10 +67,10 @@ export function WorkflowEditorPage() {
 
     const numericFields: FieldDefinition[] = [];
     for (const f of allFields) {
-      if (f.data_type === "numero") {
+      if (isNumericDataType(f.data_type)) {
         numericFields.push(f);
       } else if (f.data_type === "tabla") {
-        const numericColumns = (f.columns ?? []).filter((c) => c.data_type === "numero");
+        const numericColumns = (f.columns ?? []).filter((c) => isNumericDataType(c.data_type));
         if (numericColumns.length > 0) numericFields.push({ ...f, columns: numericColumns });
       }
     }
@@ -86,65 +88,10 @@ export function WorkflowEditorPage() {
     setName(workflow.name);
     setDocumentTypeId(workflow.document_type_id);
     setTriggerType(workflow.trigger_type);
+    setDestination(workflow.destination);
+    setWebhookUrl(workflow.destination_config?.url ?? "");
     setFieldThresholds(workflow.field_thresholds);
   }, [workflow]);
-
-  const layoutKey = workflowId ?? "draft";
-  const positionsRef = useRef<Record<string, { x: number; y: number }>>({ ...INITIAL_POSITIONS });
-
-  const [nodes, setNodes, onNodesChangeRaw] = useNodesState<FlowNode>([
-    {
-      id: "trigger",
-      type: "trigger",
-      position: INITIAL_POSITIONS.trigger,
-      data: {
-        triggerType: "manual",
-        onTriggerTypeChange: () => {},
-        canRun: false,
-        onFileSelected: () => {},
-        stagedFileName: null,
-        runStatus: "idle",
-      },
-    },
-    {
-      id: "documentType",
-      type: "documentType",
-      position: INITIAL_POSITIONS.documentType,
-      data: { documentTypeId: null, documentTypes: [], onChange: () => {} },
-    },
-    {
-      id: "validation",
-      type: "validation",
-      position: INITIAL_POSITIONS.validation,
-      data: { hasDocumentType: false, fields: [], thresholds: {}, onToggleField: () => {}, onChange: () => {} },
-    },
-    { id: "destination", type: "destination", position: INITIAL_POSITIONS.destination, data: {} },
-  ]);
-
-  // Carga la disposición guardada en este navegador para este flujo (si existe).
-  useEffect(() => {
-    const stored = loadWorkflowLayout(layoutKey);
-    if (!stored) return;
-    positionsRef.current = { ...positionsRef.current, ...stored };
-    setNodes((nds) => nds.map((n) => (stored[n.id] ? { ...n, position: stored[n.id] } : n)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [layoutKey]);
-
-  // Guarda la disposición al terminar de arrastrar un nodo (no en cada frame del drag).
-  const onNodesChange = useCallback(
-    (changes: NodeChange<FlowNode>[]) => {
-      onNodesChangeRaw(changes);
-      let dragEnded = false;
-      for (const c of changes) {
-        if (c.type === "position") {
-          if (c.position) positionsRef.current[c.id] = c.position;
-          if (c.dragging === false) dragEnded = true;
-        }
-      }
-      if (dragEnded) saveWorkflowLayout(layoutKey, positionsRef.current);
-    },
-    [onNodesChangeRaw, layoutKey]
-  );
 
   const isSaving = createWorkflow.isPending || updateWorkflow.isPending;
 
@@ -153,15 +100,13 @@ export function WorkflowEditorPage() {
   const canRun = workflow?.status !== "paused";
   const disabledReason = workflow?.status === "paused" ? "El flujo está pausado — reanúdalo para poder probarlo." : undefined;
 
-  // Seleccionar un archivo solo lo deja listo — no ejecuta nada todavía. `setStagedFile`
-  // es estable (viene de useState), así que este callback puede tener deps vacías sin
-  // necesitar el truco de ref que sí hace falta para handleRunClick más abajo.
-  const handleFileSelected = useCallback((file: File) => {
+  // Seleccionar un archivo solo lo deja listo — no ejecuta nada todavía.
+  const handleFileSelected = (file: File) => {
     setStagedFile(file);
     setRunStatus("idle");
     setRunError(undefined);
     setLastExecutionId(undefined);
-  }, []);
+  };
 
   // Guarda el flujo con la config actual (creándolo si aún no existe) y devuelve su id.
   // Si falta el nombre, marca el error inline y devuelve undefined sin guardar nada.
@@ -188,7 +133,8 @@ export function WorkflowEditorPage() {
     const payload = {
       name: trimmedName,
       document_type_id: documentTypeId,
-      destination: "internal_db" as const,
+      destination,
+      destination_config: destination === "webhook" ? { url: webhookUrl.trim() } : null,
       trigger_type: triggerType,
       field_thresholds: cleanedThresholds,
     };
@@ -196,11 +142,6 @@ export function WorkflowEditorPage() {
     let id = workflowId;
     if (id === undefined) {
       const created = await createWorkflow.mutateAsync(payload);
-      const draftLayout = loadWorkflowLayout("draft");
-      if (draftLayout) {
-        saveWorkflowLayout(created.id, draftLayout);
-        clearWorkflowLayout("draft");
-      }
       id = created.id;
       setWorkflowId(id);
       navigate(`/workflows/${id}`, { replace: true });
@@ -236,87 +177,52 @@ export function WorkflowEditorPage() {
     }
   };
 
-  // Actualiza solo los datos de cada nodo (sin tocar su posición) cuando cambia
-  // la config, para que arrastrar un nodo en el canvas no se resetee.
-  useEffect(() => {
-    setNodes((nds) =>
-      nds.map((n): FlowNode => {
-        if (n.type === "trigger") {
-          return {
-            ...n,
-            data: {
-              triggerType,
-              onTriggerTypeChange: (t: WorkflowTriggerType) => {
-                setTriggerType(t);
-                setSaved(false);
-              },
-              canRun,
-              disabledReason,
-              onFileSelected: handleFileSelected,
-              stagedFileName: stagedFile?.name ?? null,
-              runStatus,
-              runError,
-              lastExecutionId,
-            },
-          };
-        }
-        if (n.type === "documentType") {
-          return {
-            ...n,
-            data: {
-              documentTypeId,
-              documentTypes: publishedTypes,
-              onChange: (docTypeId: string | null) => {
-                setDocumentTypeId(docTypeId);
-                setSaved(false);
-              },
-            },
-          };
-        }
-        if (n.type === "validation") {
-          return {
-            ...n,
-            data: {
-              hasDocumentType: documentTypeId !== null,
-              fields: documentTypeFields,
-              thresholds: fieldThresholds,
-              onToggleField: (fieldName: string, enabled: boolean) => {
-                setFieldThresholds((prev) => {
-                  if (enabled) return { ...prev, [fieldName]: prev[fieldName] ?? { min: null, max: null } };
-                  const next = { ...prev };
-                  delete next[fieldName];
-                  return next;
-                });
-                setSaved(false);
-              },
-              onChange: (fieldName: string, patch: Partial<WorkflowFieldThreshold>) => {
-                setFieldThresholds((prev) => {
-                  const existing = prev[fieldName] ?? { min: null, max: null };
-                  return { ...prev, [fieldName]: { ...existing, ...patch } };
-                });
-                setSaved(false);
-              },
-            },
-          };
-        }
-        return n;
-      })
-    );
-  }, [
-    documentTypeId,
-    publishedTypes,
-    triggerType,
-    canRun,
-    disabledReason,
-    handleFileSelected,
-    stagedFile,
-    runStatus,
-    runError,
-    lastExecutionId,
-    documentTypeFields,
-    fieldThresholds,
-    setNodes,
-  ]);
+  // resumen compacto + estado "configurado" de cada paso, para las tarjetas del
+  // stepper - los campos reales se editan en el panel lateral (ver WorkflowStepPanel)
+  const activeThresholdCount = Object.keys(fieldThresholds).length;
+  const stepDefs: { id: NodeId; icon: React.ReactNode; tone: Tone; step: number; title: string; summary: string; complete: boolean }[] = [
+    {
+      id: "trigger",
+      icon: <UploadCloud size={15} />,
+      tone: "primary",
+      step: 1,
+      title: "Cargar documentos",
+      summary: stagedFile ? `Archivo listo: ${stagedFile.name}` : "Sin archivo cargado todavía",
+      complete: stagedFile != null,
+    },
+    {
+      id: "documentType",
+      icon: <FileText size={15} />,
+      tone: "accent",
+      step: 2,
+      title: "Tipo de documento",
+      summary: selectedDocType ? selectedDocType.name : "Sin tipo seleccionado",
+      complete: documentTypeId !== null,
+    },
+    {
+      id: "validation",
+      icon: <FileCheck2 size={15} />,
+      tone: "warning",
+      step: 3,
+      title: "Validaciones",
+      summary: activeThresholdCount > 0 ? `${activeThresholdCount} campo(s) con umbral` : "Sin umbrales configurados",
+      complete: true,
+    },
+    {
+      id: "destination",
+      icon: <Database size={15} />,
+      tone: "success",
+      step: 4,
+      title: "Destino",
+      summary:
+        destination === "internal_db"
+          ? "Base de datos interna"
+          : webhookUrl.trim()
+            ? `Webhook: ${webhookUrl}`
+            : "Falta la URL del webhook",
+      complete: destination === "internal_db" || webhookUrl.trim() !== "",
+    },
+  ];
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
@@ -379,11 +285,12 @@ export function WorkflowEditorPage() {
               <CheckCircle2 size={13} /> Guardado
             </span>
           )}
+          <OrientationToggle value={orientation} onChange={setOrientation} />
           <button
             className="btn"
             onClick={handleRunClick}
             disabled={!canRun || !stagedFile || runStatus === "running"}
-            title={!stagedFile ? "Elige un archivo en el nodo \"Cargar documentos\" primero" : undefined}
+            title={!stagedFile ? "Elige un archivo en el paso \"Cargar documentos\" primero" : undefined}
           >
             {runStatus === "running" ? <Loader2 size={16} className="spin" /> : <Play size={16} />}
             {runStatus === "running" ? "Ejecutando..." : "Ejecutar"}
@@ -395,20 +302,103 @@ export function WorkflowEditorPage() {
         </div>
       </div>
 
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ReactFlow
-          nodes={nodes}
-          edges={FIXED_EDGES}
-          onNodesChange={onNodesChange}
-          nodeTypes={nodeTypes}
-          nodesConnectable={false}
-          edgesFocusable={false}
-          fitView
-          fitViewOptions={{ padding: 0.3 }}
-        >
-          <Background />
-          <Controls showInteractive={false} />
-        </ReactFlow>
+      <div ref={splitRef} style={{ flex: 1, minHeight: 0, display: "flex" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <WorkflowStepper orientation={orientation}>
+            {stepDefs.map((d) => (
+              <EditorStepNode
+                key={d.id}
+                data={{
+                  icon: d.icon,
+                  tone: d.tone,
+                  step: d.step,
+                  title: d.title,
+                  summary: d.summary,
+                  complete: d.complete,
+                  selected: selectedStep === d.id,
+                  onSelect: () => setSelectedStep(d.id),
+                }}
+              />
+            ))}
+          </WorkflowStepper>
+        </div>
+
+        {selectedStep && (
+          <>
+            <div
+              onPointerDown={handleResizePointerDown}
+              onPointerMove={handleResizePointerMove}
+              onPointerUp={handleResizePointerUp}
+              onPointerCancel={handleResizePointerUp}
+              title="Arrastra para ajustar el ancho del panel"
+              style={{
+                width: 6,
+                flexShrink: 0,
+                cursor: "col-resize",
+                background: isResizingPanel ? "var(--primary)" : "var(--border)",
+                touchAction: "none",
+              }}
+            />
+            <WorkflowStepPanel
+              key={selectedStep}
+              nodeId={selectedStep}
+              onClose={() => setSelectedStep(undefined)}
+              width={panelWidth}
+              triggerData={{
+                triggerType,
+                onTriggerTypeChange: (t) => {
+                  setTriggerType(t);
+                  setSaved(false);
+                },
+                canRun,
+                disabledReason,
+                onFileSelected: handleFileSelected,
+                stagedFileName: stagedFile?.name ?? null,
+                runStatus,
+                runError,
+                lastExecutionId,
+              }}
+              documentTypeData={{
+                documentTypeId,
+                documentTypes: publishedTypes,
+                onChange: (docTypeId) => {
+                  setDocumentTypeId(docTypeId);
+                  setSaved(false);
+                },
+              }}
+              validationData={{
+                hasDocumentType: documentTypeId !== null,
+                fields: documentTypeFields,
+                thresholds: fieldThresholds,
+                onToggleField: (fieldName, enabled) => {
+                  setFieldThresholds((prev) => {
+                    if (enabled) return { ...prev, [fieldName]: prev[fieldName] ?? { min: null, max: null } };
+                    const next = { ...prev };
+                    delete next[fieldName];
+                    return next;
+                  });
+                  setSaved(false);
+                },
+                onChange: (fieldName, patch) => {
+                  setFieldThresholds((prev) => {
+                    const existing = prev[fieldName] ?? { min: null, max: null };
+                    return { ...prev, [fieldName]: { ...existing, ...patch } };
+                  });
+                  setSaved(false);
+                },
+              }}
+              destinationData={{
+                destination,
+                webhookUrl,
+                onChange: (nextDestination, nextWebhookUrl) => {
+                  setDestination(nextDestination);
+                  setWebhookUrl(nextWebhookUrl);
+                  setSaved(false);
+                },
+              }}
+            />
+          </>
+        )}
       </div>
     </div>
   );

@@ -1,19 +1,15 @@
-import type { NodeProps, Node } from "@xyflow/react";
-import { FileCheck2 } from "lucide-react";
 import type { FieldDefinition, WorkflowFieldThreshold } from "../../../api/types";
 import { DATA_TYPE_ICON } from "../../../utils/dataType";
-import { NodeShell } from "./NodeShell";
 import { fieldControlStyle } from "./styles";
 
 // --- 3. Validaciones ---
-export interface ValidationNodeData extends Record<string, unknown> {
+export interface ValidationNodeData {
   hasDocumentType: boolean;
   fields: FieldDefinition[];
   thresholds: Record<string, WorkflowFieldThreshold>;
   onToggleField: (key: string, enabled: boolean) => void;
   onChange: (key: string, patch: Partial<WorkflowFieldThreshold>) => void;
 }
-export type ValidationNodeType = Node<ValidationNodeData, "validation">;
 
 function FieldThresholdRow({
   field,
@@ -38,7 +34,6 @@ function FieldThresholdRow({
   return (
     <div style={{ padding: "6px 0", borderBottom: nested ? "none" : "1px solid var(--border)" }}>
       <label
-        className="nodrag"
         style={{
           display: "flex",
           alignItems: "center",
@@ -59,7 +54,7 @@ function FieldThresholdRow({
       </label>
 
       {checked && (
-        <div className="nodrag" style={{ display: "flex", gap: 6, marginTop: 5, marginLeft: 18 }}>
+        <div style={{ display: "flex", gap: 6, marginTop: 5, marginLeft: 18 }}>
           <input
             type="number"
             placeholder="Mín"
@@ -96,29 +91,25 @@ function FieldThresholdRow({
   );
 }
 
-export function ValidationNode({ data }: NodeProps<ValidationNodeType>) {
-  return (
-    <NodeShell icon={<FileCheck2 size={15} />} tone="warning" step={3} title="Validaciones">
-      {data.fields.length === 0 ? (
-        <p style={{ margin: 0, fontSize: 11, color: "var(--text-muted)" }}>
-          {data.hasDocumentType
-            ? "Este tipo de documento no tiene campos numéricos para definir umbrales."
-            : "Selecciona un tipo de documento en el paso 2 para configurar qué campos validar."}
-        </p>
-      ) : (
-        <div style={{ maxHeight: 260, overflow: "auto" }}>
-          {data.fields.map((f) => (
-            <FieldThresholdRow
-              key={f.name}
-              field={f}
-              thresholdKey={f.name}
-              thresholds={data.thresholds}
-              onToggleField={data.onToggleField}
-              onChange={data.onChange}
-            />
-          ))}
-        </div>
-      )}
-    </NodeShell>
+export function ValidationNode({ data }: { data: ValidationNodeData }) {
+  return data.fields.length === 0 ? (
+    <p style={{ margin: 0, fontSize: 11, color: "var(--text-muted)" }}>
+      {data.hasDocumentType
+        ? "Este tipo de documento no tiene campos numéricos para definir umbrales."
+        : "Selecciona un tipo de documento en el paso 2 para configurar qué campos validar."}
+    </p>
+  ) : (
+    <div>
+      {data.fields.map((f) => (
+        <FieldThresholdRow
+          key={f.name}
+          field={f}
+          thresholdKey={f.name}
+          thresholds={data.thresholds}
+          onToggleField={data.onToggleField}
+          onChange={data.onChange}
+        />
+      ))}
+    </div>
   );
 }

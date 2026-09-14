@@ -26,6 +26,20 @@ class Settings(BaseSettings):
     # Pipeline
     confidence_threshold: float = 0.8
     storage_dir: Path = Path(__file__).resolve().parent.parent / "storage"
+    retry_backoff_seconds: float = 2.0
+
+    # Subida de documentos
+    max_upload_mb: int = 25
+    allowed_upload_extensions: set[str] = {
+        ".pdf",
+        ".png",
+        ".jpg",
+        ".jpeg",
+        ".tif",
+        ".tiff",
+        ".bmp",
+        ".heif",
+    }
 
     @property
     def sqlalchemy_database_uri(self) -> str:

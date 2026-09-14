@@ -299,15 +299,3 @@ a {
   animation: bounce-dot 1.2s infinite;
 }
 
-.react-flow__node {
-  cursor: grab;
-}
-
-.react-flow__node.dragging {
-  cursor: grabbing;
-}
-
-.react-flow__node:focus,
-.react-flow__node:focus-visible {
-  outline: none;
-}

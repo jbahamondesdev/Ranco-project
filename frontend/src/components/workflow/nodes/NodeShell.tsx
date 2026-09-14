@@ -1,5 +1,3 @@
-import { Handle, Position } from "@xyflow/react";
-
 const NODE_WIDTH = 240;
 
 export type Tone = "primary" | "accent" | "warning" | "success";
@@ -11,49 +9,36 @@ const TONE_COLORS: Record<Tone, { color: string; bg: string }> = {
   success: { color: "var(--success)", bg: "var(--success-bg)" },
 };
 
-function handleStyle(color: string): React.CSSProperties {
-  return {
-    width: 10,
-    height: 10,
-    background: color,
-    border: "2px solid var(--surface)",
-    boxShadow: "0 0 0 1px " + color,
-  };
-}
-
 export function NodeShell({
   icon,
   tone,
   step,
   title,
   children,
-  showTarget = true,
-  showSource = true,
-  cursor = "grab",
+  onClick,
 }: {
   icon: React.ReactNode;
   tone: Tone;
   step: number;
   title: string;
   children: React.ReactNode;
-  showTarget?: boolean;
-  showSource?: boolean;
-  cursor?: string;
+  onClick?: () => void;
 }) {
   const { color, bg } = TONE_COLORS[tone];
   return (
     <div
+      onClick={onClick}
       style={{
         width: NODE_WIDTH,
+        flexShrink: 0,
         background: "var(--surface)",
         border: "1px solid var(--border)",
         borderRadius: 14,
         boxShadow: "var(--shadow-md)",
         overflow: "hidden",
-        cursor,
+        cursor: onClick ? "pointer" : "default",
       }}
     >
-      {showTarget && <Handle type="target" position={Position.Left} style={handleStyle(color)} />}
       <div
         style={{
           display: "flex",
@@ -94,7 +79,6 @@ export function NodeShell({
         </div>
       </div>
       <div style={{ padding: "12px 14px 14px" }}>{children}</div>
-      {showSource && <Handle type="source" position={Position.Right} style={handleStyle(color)} />}
     </div>
   );
 }

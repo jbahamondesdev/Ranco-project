@@ -1,10 +1,10 @@
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.db import get_by_public_id, get_db, get_or_404
+from app.db import DEFAULT_LIST_LIMIT, MAX_LIST_LIMIT, get_by_public_id, get_db, get_or_404, paginate
 from app.models.document import Document
 from app.models.document_type import DocumentType, DocumentTypeVersion
 from app.models.execution import Execution
@@ -52,8 +52,13 @@ def _document_type_detail_out(doc_type: DocumentType) -> dict:
 
 
 @router.get("", response_model=list[DocumentTypeOut])
-def list_document_types(db: Session = Depends(get_db)):
-    doc_types = db.scalars(select(DocumentType).order_by(DocumentType.created_at.desc())).all()
+def list_document_types(
+    limit: int = Query(DEFAULT_LIST_LIMIT, ge=1, le=MAX_LIST_LIMIT),
+    offset: int = Query(0, ge=0),
+    db: Session = Depends(get_db),
+):
+    query = select(DocumentType).order_by(DocumentType.created_at.desc())
+    doc_types = db.scalars(paginate(query, limit, offset)).all()
     return [_document_type_out(dt) for dt in doc_types]
 
 

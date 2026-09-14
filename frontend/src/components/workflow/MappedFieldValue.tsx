@@ -12,6 +12,9 @@ function parseRows(value: string | null): Record<string, unknown>[] {
 
 /** Muestra el valor de un campo mapeado: texto plano, o una mini-tabla si es de tipo "tabla". */
 export function MappedFieldValue({ field }: { field: Pick<MappedField, "data_type" | "value"> }) {
+  if (field.data_type === "porcentaje") {
+    return <>{field.value != null ? `${field.value}%` : "—"}</>;
+  }
   if (field.data_type !== "tabla") {
     return <>{field.value ?? "—"}</>;
   }

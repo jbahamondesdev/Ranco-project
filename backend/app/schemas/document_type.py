@@ -3,11 +3,11 @@ from typing import Literal
 
 from pydantic import BaseModel, ConfigDict
 
-DataType = Literal["texto", "numero", "fecha", "booleano", "tabla"]
+DataType = Literal["texto", "numero", "fecha", "booleano", "tabla", "porcentaje"]
 
 
 class ValidationRule(BaseModel):
-    type: Literal["obligatorio", "regex", "min", "max"]
+    type: Literal["obligatorio", "min", "max"]
     value: str | None = None
 
 
@@ -16,6 +16,14 @@ class FieldDefinition(BaseModel):
     data_type: DataType
     required: bool = False
     validation_rules: list[ValidationRule] = []
+    # instruccion puntual de donde/como extraer este campo cuando el nombre y tipo de
+    # dato no bastan para desambiguarlo (ej. "tomar el TOTAL fuera de la tabla, no el
+    # subtotal de una fila"). Se guarda como parte del campo (no en el chat, que es
+    # efimero) y viaja al LLM como la "description" de su propiedad en el JSON Schema
+    # de extraccion (ver pipeline/json_schema.py) - asi el prompt general se mantiene
+    # generico y la contextualizacion por campo queda donde corresponde: en la
+    # configuracion del tipo de documento, persistida y versionada.
+    description: str | None = None
     # solo si data_type == "tabla": definicion de columnas
     columns: list["FieldDefinition"] | None = None
 

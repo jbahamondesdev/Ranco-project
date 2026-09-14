@@ -1,6 +1,6 @@
 export { NodeShell, type Tone } from "./NodeShell";
 export { fieldControlStyle, fieldLabelStyle } from "./styles";
-export { TriggerNode, type TriggerNodeData, type TriggerNodeType, type TriggerRunStatus } from "./TriggerNode";
-export { DocumentTypeNode, type DocumentTypeNodeData, type DocumentTypeNodeType } from "./DocumentTypeNode";
-export { ValidationNode, type ValidationNodeData, type ValidationNodeType } from "./ValidationNode";
-export { DestinationNode, type DestinationNodeData, type DestinationNodeType } from "./DestinationNode";
+export { TriggerNode, type TriggerNodeData, type TriggerRunStatus } from "./TriggerNode";
+export { DocumentTypeNode, type DocumentTypeNodeData } from "./DocumentTypeNode";
+export { ValidationNode, type ValidationNodeData } from "./ValidationNode";
+export { DestinationNode, type DestinationNodeData } from "./DestinationNode";

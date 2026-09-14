@@ -1,18 +1,9 @@
 import { useState } from "react";
-import {
-  Ban,
-  CheckCircle2,
-  Eye,
-  EyeOff,
-  ExternalLink,
-  Pencil,
-  X,
-} from "lucide-react";
-import { useDocument, getDocumentFileUrl } from "../../api/documents";
-import { useResolveMappedField } from "../../api/executions";
-import { guessPreviewKind } from "../../utils/documentPreview";
+import { useNavigate } from "react-router-dom";
+import { Ban, CheckCircle2, Download, ExternalLink, Pencil, RefreshCw, X } from "lucide-react";
+import { getDocumentFileUrl } from "../../api/documents";
+import { getExecutionExportUrl, useCreateExecution, useResolveMappedField } from "../../api/executions";
 import { DATA_TYPE_ICON, DATA_TYPE_LABEL } from "../../utils/dataType";
-import { Spinner } from "../common/Spinner";
 import { useRole } from "../../state/role";
 import { displayExecutionStatus, hasUnresolvedIssues } from "../../workflow/executionStatus";
 import type { NodeId } from "../../workflow/graph";
@@ -64,14 +55,12 @@ export function NodeDetailPanel({
   width: number;
 }) {
   const { role } = useRole();
+  const navigate = useNavigate();
   const resolveMappedField = useResolveMappedField(execution.id);
-  const { data: sourceDocument } = useDocument(nodeId === "validation" ? execution.document_id : undefined);
-  const [showDocument, setShowDocument] = useState(false);
+  const createExecution = useCreateExecution();
   const [editingFieldId, setEditingFieldId] = useState<string | null>(null);
   const [editValue, setEditValue] = useState("");
   const [destinationTab, setDestinationTab] = useState<"resumen" | "json">("resumen");
-
-  const previewKind = sourceDocument ? guessPreviewKind(sourceDocument.original_filename) : null;
 
   const startEdit = (field: MappedField) => {
     setEditingFieldId(field.id);
@@ -89,6 +78,19 @@ export function NodeDetailPanel({
   };
 
   const status = displayExecutionStatus(execution.status, hasUnresolvedIssues(execution));
+
+  const retry = () => {
+    createExecution.mutate(
+      { documentId: execution.document_id, workflowId: execution.workflow_id ?? undefined },
+      {
+        onSuccess: (newExecution) => {
+          if (execution.workflow_id) {
+            navigate(`/workflows/${execution.workflow_id}/ejecuciones/${newExecution.id}`);
+          }
+        },
+      }
+    );
+  };
 
   return (
     <div
@@ -236,48 +238,15 @@ export function NodeDetailPanel({
       {nodeId === "validation" && (
         <>
           <PanelSection title="Documento original">
-            <button
+            <a
+              href={getDocumentFileUrl(execution.document_id)}
+              target="_blank"
+              rel="noreferrer"
               className="btn"
-              style={{ fontSize: 12, marginBottom: showDocument ? 10 : 0, display: "inline-flex", alignItems: "center", gap: 6 }}
-              onClick={() => setShowDocument((v) => !v)}
+              style={{ fontSize: 12, display: "inline-flex", alignItems: "center", gap: 6 }}
             >
-              {showDocument ? <EyeOff size={13} /> : <Eye size={13} />}
-              {showDocument ? "Ocultar documento" : "Ver documento original"}
-            </button>
-            {showDocument && (
-              <>
-                <div style={{ border: "1px solid var(--border)", borderRadius: 8, overflow: "hidden" }}>
-                  {previewKind === "pdf" && (
-                    <iframe
-                      title="documento original"
-                      src={getDocumentFileUrl(execution.document_id)}
-                      style={{ width: "100%", height: 380, border: "none", display: "block" }}
-                    />
-                  )}
-                  {previewKind === "image" && (
-                    <img
-                      src={getDocumentFileUrl(execution.document_id)}
-                      alt="documento original"
-                      style={{ width: "100%", objectFit: "contain", display: "block" }}
-                    />
-                  )}
-                  {previewKind === "other" && (
-                    <p style={{ fontSize: 12, color: "var(--text-muted)", padding: 12, margin: 0 }}>
-                      No hay previsualización disponible para este formato ({execution.document_filename}).
-                    </p>
-                  )}
-                  {!previewKind && <Spinner center size={20} />}
-                </div>
-                <a
-                  href={getDocumentFileUrl(execution.document_id)}
-                  target="_blank"
-                  rel="noreferrer"
-                  style={{ display: "inline-flex", alignItems: "center", gap: 4, fontSize: 12, marginTop: 8 }}
-                >
-                  <ExternalLink size={12} /> Abrir en una pestaña nueva
-                </a>
-              </>
-            )}
+              <ExternalLink size={13} /> Abrir documento original en una pestaña nueva
+            </a>
           </PanelSection>
 
           <PanelSection title="Entrada">
@@ -431,9 +400,59 @@ export function NodeDetailPanel({
                   Terminado: {new Date(execution.completed_at).toLocaleString()}
                 </p>
               )}
+              {execution.mapped_fields.length > 0 && (
+                <a
+                  href={getExecutionExportUrl(execution.id)}
+                  className="btn"
+                  style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12 }}
+                >
+                  <Download size={13} /> Exportar CSV
+                </a>
+              )}
               {execution.status === "error" && execution.error_message && (
                 <p style={{ fontSize: 13, marginTop: 8, color: "var(--danger)" }}>{execution.error_message}</p>
               )}
+              {execution.status === "error" && (
+                <button
+                  className="btn btn-primary"
+                  style={{ marginTop: 12, display: "inline-flex", alignItems: "center", gap: 6 }}
+                  disabled={createExecution.isPending}
+                  onClick={retry}
+                >
+                  <RefreshCw size={13} /> {createExecution.isPending ? "Reprocesando..." : "Reprocesar documento"}
+                </button>
+              )}
+            </PanelSection>
+          )}
+
+          {destinationTab === "resumen" && execution.events.length > 0 && (
+            <PanelSection title="Historial de eventos">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Etapa</th>
+                    <th>Estado</th>
+                    <th>Mensaje</th>
+                    <th>Hora</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {execution.events.map((ev) => (
+                    <tr key={ev.id}>
+                      <td>{ev.stage}</td>
+                      <td>
+                        <span className={`badge ${ev.status === "error" ? "badge-danger" : ev.status === "retry" ? "badge-warning" : "badge-success"}`}>
+                          {ev.status}
+                        </span>
+                      </td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)", maxWidth: 220 }}>{ev.message ?? "—"}</td>
+                      <td style={{ fontSize: 12, color: "var(--text-muted)", whiteSpace: "nowrap" }}>
+                        {new Date(ev.timestamp).toLocaleTimeString()}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </PanelSection>
           )}
 
