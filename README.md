@@ -1,7 +1,5 @@
 # Plataforma de extracción y mapeo de documentos (MVP local)
 
-Ver [`PRD.md`](./PRD.md) para el detalle de producto. Este README cubre cómo levantar el proyecto localmente.
-
 ## Estructura
 
 - `backend/` — API FastAPI (Python, gestionado con [`uv`](https://docs.astral.sh/uv/)). Orquesta ingesta, extracción (Azure Document Intelligence), mapeo (Azure OpenAI) y validación. Persiste en SQL Server Express.
